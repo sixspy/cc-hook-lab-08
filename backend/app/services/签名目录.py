@@ -43,6 +43,8 @@ def 概览() -> dict:
             "死信": c("SELECT COUNT(*) FROM 事件 WHERE 状态='死信'"),
             "尝试数": c("SELECT COUNT(*) FROM 投递尝试"),
             "死信匣": c("SELECT COUNT(*) FROM 死信 WHERE 状态='待处置'"),
+            "已脱敏": c("SELECT COUNT(*) FROM 事件 WHERE 摘要脱敏态='已脱敏'"),
+            "待补档": c("SELECT COUNT(*) FROM 事件 WHERE 摘要脱敏态<>'已脱敏'"),
             "签名规": 签名规(),
         }
     finally:
@@ -52,18 +54,21 @@ def 概览() -> dict:
 def 事件列表() -> list:
     conn = 连接()
     try:
-        return [dict(r) for r in conn.execute("SELECT * FROM 事件 ORDER BY 入队时 DESC").fetchall()]
+        rows = conn.execute("SELECT * FROM 事件 ORDER BY 入队时 DESC").fetchall()
     finally:
         conn.close()
+    from app.services import 载荷脱敏
+    return [载荷脱敏.修饰事件(r) for r in rows]
 
 
 def 事件一条(事件号: str) -> dict | None:
+    from app.services import 载荷脱敏
     conn = 连接()
     try:
         row = conn.execute("SELECT * FROM 事件 WHERE 事件号=?", (事件号,)).fetchone()
         if not row:
             return None
-        d = dict(row)
+        d = 载荷脱敏.修饰事件(row)
         d["尝试"] = [dict(x) for x in conn.execute(
             "SELECT * FROM 投递尝试 WHERE 事件号=? ORDER BY 投递时 DESC", (事件号,)
         ).fetchall()]
@@ -74,12 +79,41 @@ def 事件一条(事件号: str) -> dict | None:
         conn.close()
 
 
+def 事件导出() -> dict:
+    """导出与列表同票：两处都只读脱敏集，导出永不带明文。"""
+    rows = 事件列表()
+    return {
+        "条数": len(rows),
+        "读引用": "现行脱敏集",
+        "导出": [
+            {
+                "事件号": r["事件号"],
+                "事件类型": r["事件类型"],
+                "端点键": r["端点键"],
+                "载荷摘要": r["载荷摘要"],
+                "摘要脱敏态": r["摘要脱敏态"],
+                "遮罩字段": r["遮罩字段"],
+            }
+            for r in rows
+        ],
+    }
+
+
 def 投递列表() -> list:
     conn = 连接()
     try:
         return [dict(r) for r in conn.execute(
             "SELECT * FROM 投递尝试 ORDER BY 投递时 DESC LIMIT 200"
         ).fetchall()]
+    finally:
+        conn.close()
+
+
+def 投递一条(尝试号: str) -> dict | None:
+    conn = 连接()
+    try:
+        row = conn.execute("SELECT * FROM 投递尝试 WHERE 尝试号=?", (尝试号,)).fetchone()
+        return dict(row) if row else None
     finally:
         conn.close()
 

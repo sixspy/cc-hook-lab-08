@@ -29,6 +29,7 @@
     </header>
 
 <section class="卷"><div class="指标" id="指标"></div></section>
+<section class="卷"><p class="说明" id="脱敏链"></p></section>
 <section class="卷"><table><thead><tr><th>事件号</th><th>事件类型</th><th>端点键</th><th>状态</th></tr></thead><tbody id="表"></tbody></table></section>
 <section class="卷"><p class="说明" id="主链"></p><button class="按钮" type="button" id="互证钮">跑投递互证</button><pre id="互证出" class="说明"></pre></section>
 
@@ -46,6 +47,10 @@
   }
   const c = await 投递台.getJSON('/api/仓情');
   document.getElementById('主链').textContent = c.主链 || '';
+  const m = await 投递台.getJSON('/api/脱敏');
+  document.getElementById('脱敏链').textContent =
+    `入队→投递→重试→死信→端点→互证 全程摘要只读脱敏集 · 脱敏规 ${m.规则版本}（指纹 ${m.规则指纹}）` +
+    ` · 快照只读：${m.只读快照 ? '是' : '否'} · 已脱敏 ${m.已脱敏} · 待补档 ${m.待补档}`;
   const rows = await 投递台.getJSON('/api/事件');
   const tb = document.getElementById('表');
   for (const r of rows.slice(0,12)) {

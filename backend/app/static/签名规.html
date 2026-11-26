@@ -35,12 +35,18 @@
   <button class="按钮" type="button" id="保存">保存签名规</button>
 </section>
 <section class="卷"><pre id="规" class="说明"></pre></section>
+<section class="卷"><p class="说明" id="脱敏规"></p></section>
 
   </main>
 
 <script>
 async function 刷() {
   document.getElementById('规').textContent = JSON.stringify(await 投递台.getJSON('/api/签名规'), null, 2);
+  const o = await 投递台.getJSON('/api/脱敏');
+  document.getElementById('脱敏规').textContent =
+    `脱敏规 ${o.规则版本}（指纹 ${o.规则指纹}）· 快照只读：${o.只读快照 ? '是' : '否'} · ` +
+    `规则内容：${o.规则内容} · 已脱敏 ${o.已脱敏} 条 · 待补档 ${o.待补档} 条` +
+    ` · 现行摘要只读脱敏集，快照冻结指纹并拒明文回刷`;
 }
 document.getElementById('保存').onclick = async () => {
   try {

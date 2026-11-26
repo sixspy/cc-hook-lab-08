@@ -29,6 +29,9 @@
     </header>
 
 <section class="卷">
+  <p class="说明" id="队列态">端点名册与事件队列同源：装闸时一并核对各端点的待投/脱敏摘要。</p>
+</section>
+<section class="卷">
   <label>端点键</label><input id="端点键" placeholder="ep-new"/>
   <label>名称</label><input id="名称"/>
   <label>回调URL</label><input id="回调URL" placeholder="https://..."/>
@@ -49,9 +52,17 @@ async function 刷表() {
     tr.children[4].appendChild(投递台.徽章(r.启用 ? '启用' : '停用'));
     const btn = document.createElement('button'); btn.className='按钮 次'; btn.type='button';
     btn.textContent = r.启用 ? '停用' : '启用';
-    btn.onclick = async () => { await 投递台.postJSON('/api/端点/启用', {端点键:r.端点键, 启用: !r.启用}); await 刷表(); };
+    btn.onclick = async () => { await 投递台.postJSON('/api/端点/启用', {端点键:r.端点键, 启用: !r.启用}); await 刷表(); await 刷队列态(); };
     tr.children[5].appendChild(btn); tb.appendChild(tr);
   }
+}
+async function 刷队列态() {
+  const evs = await 投递台.getJSON('/api/事件');
+  const 待 = evs.filter(e => e.状态 === '待投' || e.状态 === '投递中');
+  const 异常 = evs.filter(e => e.摘要脱敏态 !== '已脱敏');
+  document.getElementById('队列态').textContent =
+    `事件队列同源：待投/投递中 ${待.length} 条 · 摘要脱敏态非「已脱敏」 ${异常.length} 条` +
+    (异常.length ? `（${异常.map(e => e.事件号).join(', ')}，见事件队列）` : ' · 现行摘要均为脱敏集');
 }
 document.getElementById('登记').onclick = async () => {
   try {
@@ -62,10 +73,10 @@ document.getElementById('登记').onclick = async () => {
       密钥版本: document.getElementById('密钥版本').value,
     });
     document.getElementById('消息').textContent = '已登记';
-    await 刷表();
+    await 刷表(); await 刷队列态();
   } catch (e) { document.getElementById('消息').textContent = e.message; }
 };
-刷表();
+刷表(); 刷队列态();
 </script>
 
 </body>

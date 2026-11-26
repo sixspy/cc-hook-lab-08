@@ -29,7 +29,8 @@
     </header>
 
 <section class="卷">
-  <button class="按钮" type="button" id="跑">跑互证</button>
+  <button class="按钮" type="button" id="跑">跑互证（含摘要对账）</button>
+  <p class="消息" id="对账"></p>
   <pre id="出" class="说明"></pre>
 </section>
 <section class="卷"><div class="表绕"><table><thead><tr><th>批次号</th><th>时刻</th><th>事件总数</th><th>已投递</th><th>死信</th><th>待投</th><th>对齐</th><th>说明</th></tr></thead><tbody id="表"></tbody></table></div></section>
@@ -45,7 +46,12 @@ async function 刷表() {
   }
 }
 document.getElementById('跑').onclick = async () => {
-  document.getElementById('出').textContent = JSON.stringify(await 投递台.postJSON('/api/互证/跑',{}), null, 2);
+  const rep = await 投递台.postJSON('/api/互证/跑',{});
+  const z = rep.摘要对账 || {};
+  document.getElementById('对账').textContent =
+    `摘要对账：${z.是否通过 ? '通过' : '失败'} · ${z.说明 || ''}` +
+    (z.明文残留 && z.明文残留.length ? ` · 明文残留 ${z.明文残留.join(', ')}` : '');
+  document.getElementById('出').textContent = JSON.stringify(rep, null, 2);
   await 刷表();
 };
 刷表();

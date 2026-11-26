@@ -27,7 +27,18 @@ CREATE TABLE IF NOT EXISTS 事件 (
   优先级 TEXT NOT NULL DEFAULT '普通',
   状态 TEXT NOT NULL DEFAULT '待投',
   入队时 TEXT NOT NULL,
-  更新时 TEXT NOT NULL
+  更新时 TEXT NOT NULL,
+  摘要脱敏态 TEXT NOT NULL DEFAULT '',
+  遮罩字段 TEXT NOT NULL DEFAULT '',
+  规则指纹 TEXT NOT NULL DEFAULT '',
+  脱敏提示 TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS 脱敏快照 (
+  规则指纹 TEXT PRIMARY KEY,
+  规则版本 TEXT NOT NULL,
+  规则内容 TEXT NOT NULL,
+  只读 INTEGER NOT NULL DEFAULT 1,
+  建立时 TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS 投递尝试 (
   尝试号 TEXT PRIMARY KEY,
@@ -71,6 +82,32 @@ CREATE TABLE IF NOT EXISTS 操作留痕 (
 """
 
 
+def _补列(conn) -> None:
+    """老库升级：补 摘要脱敏态/遮罩字段/规则指纹/脱敏提示 列。"""
+    现有 = {r["name"] for r in conn.execute("PRAGMA table_info(事件)").fetchall()}
+    for 列 in ("摘要脱敏态", "遮罩字段", "规则指纹", "脱敏提示"):
+        if 列 not in 现有:
+            conn.execute(f"ALTER TABLE 事件 ADD COLUMN {列} TEXT NOT NULL DEFAULT ''")
+
+
+def _补档(conn) -> None:
+    """给所有未打脱敏态的事件（含种子样例）补档：含明文则遮罩并记待补档，绝不留明文。"""
+    from app.services import 载荷脱敏
+
+    载荷脱敏.建快照(conn)
+    存量 = conn.execute(
+        "SELECT 事件号, 载荷摘要 FROM 事件 WHERE 摘要脱敏态='' "
+        "OR 摘要脱敏态 IS NULL"
+    ).fetchall()
+    for r in 存量:
+        脱敏, 态, 指纹, 文案 = 载荷脱敏.补档(conn, r["事件号"], r["载荷摘要"])
+        conn.execute(
+            "UPDATE 事件 SET 载荷摘要=?, 摘要脱敏态=?, 规则指纹=?, 遮罩字段=?, 脱敏提示=? WHERE 事件号=?",
+            (脱敏, 态, 指纹, "", 文案, r["事件号"]),
+        )
+    conn.commit()
+
+
 def 此刻() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -78,6 +115,7 @@ def 此刻() -> str:
 def 初始化库() -> None:
     conn = 连接()
     conn.executescript(建表)
+    _补列(conn)
     if conn.execute("SELECT COUNT(*) AS c FROM 用户").fetchone()["c"] == 0:
         conn.execute("INSERT INTO 用户(账号,密码哈希,角色) VALUES (?,?,?)", ("admin", "123456", "管理员"))
     if conn.execute("SELECT COUNT(*) AS c FROM 签名规").fetchone()["c"] == 0:
@@ -126,5 +164,6 @@ def 初始化库() -> None:
             "INSERT INTO 操作留痕(时刻,操作,事件号,详情) VALUES (?,?,?,?)",
             (t, "种子", "", "初始化投递台样例"),
         )
+    _补档(conn)
     conn.commit()
     conn.close()

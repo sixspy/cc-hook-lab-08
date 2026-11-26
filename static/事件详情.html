@@ -30,19 +30,35 @@
 
 <section class="卷">
   <label>事件号</label><input id="事件号"/>
+  <p class="消息" id="消息"></p>
   <button class="按钮" type="button" id="查">查询</button>
+  <p class="说明" id="摘要态"></p>
   <pre id="出" class="说明"></pre>
 </section>
 
   </main>
 
 <script>
-document.getElementById('查').onclick = async () => {
+function 读态(d) {
+  const 态 = d.摘要脱敏态 || '待补档';
+  const 遮 = d.遮罩字段 || '—';
+  const 账 = d.摘要对账 || {};
+  return `摘要脱敏态：${态} · 字段遮罩：${遮} · 提示：${d.脱敏提示 || ''} · 对账：${账.结论 || '—'}（${账.说明 || ''}）`;
+}
+async function 查询(id) {
+  const 消息 = document.getElementById('消息');
   try {
-    const id = document.getElementById('事件号').value;
-    document.getElementById('出').textContent = JSON.stringify(await 投递台.getJSON('/api/事件/'+encodeURIComponent(id)), null, 2);
-  } catch (e) { document.getElementById('出').textContent = e.message; }
-};
+    if (!id) return;
+    const d = await 投递台.getJSON('/api/事件/'+encodeURIComponent(id));
+    document.getElementById('摘要态').textContent = 读态(d);
+    document.getElementById('出').textContent = JSON.stringify(d, null, 2);
+  } catch (e) { 消息.textContent = e.message; }
+}
+document.getElementById('查').onclick = () => 查询(document.getElementById('事件号').value);
+(() => {
+  const id = new URLSearchParams(location.search).get('事件号') || '';
+  if (id) { document.getElementById('事件号').value = id; 查询(id); }
+})();
 </script>
 
 </body>

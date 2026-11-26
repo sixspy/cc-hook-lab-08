@@ -36,6 +36,7 @@
   <button class="按钮 次" type="button" id="批量钮">批量重试待投</button>
 </section>
 <section class="卷"><div class="表绕"><table><thead><tr><th>尝试号</th><th>事件号</th><th>端点键</th><th>签名摘要</th><th>状态</th><th>响应码</th></tr></thead><tbody id="表"></tbody></table></div></section>
+<section class="卷"><pre id="卡片" class="说明">点一行查看该事件现行脱敏摘要与脱敏提示。</pre></section>
 
   </main>
 
@@ -46,6 +47,15 @@ async function 刷表() {
   for (const r of rows) {
     const tr = 投递台.行('<td>'+投递台.安全文本(r.尝试号)+'</td><td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.签名摘要)+'</td><td></td><td>'+投递台.安全文本(r.响应码)+'</td>');
     tr.children[4].appendChild(投递台.徽章(r.状态)); tb.appendChild(tr);
+    tr.style.cursor = 'pointer';
+    tr.onclick = async () => {
+      try {
+        const ev = await 投递台.getJSON('/api/事件/'+encodeURIComponent(r.事件号));
+        document.getElementById('卡片').textContent =
+          `投递尝试 ${r.尝试号} · 事件 ${r.事件号} · 端点 ${r.端点键} · 状态 ${r.状态}\n` +
+          `事件现行摘要（脱敏集）：${ev.载荷摘要}\n摘要脱敏态：${ev.摘要脱敏态} · 字段遮罩：${ev.遮罩字段 || '—'}\n${ev.脱敏提示 || ''}`;
+      } catch (e) { document.getElementById('卡片').textContent = e.message; }
+    };
   }
 }
 document.getElementById('投递钮').onclick = async () => {

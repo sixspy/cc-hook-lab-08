@@ -74,6 +74,15 @@ def create_app() -> Flask:
     def api_事件():
         return jsonify(签名目录.事件列表())
 
+    @app.get("/api/事件/导出")
+    def api_事件导出():
+        return jsonify(签名目录.事件导出())
+
+    @app.get("/api/脱敏")
+    def api_脱敏():
+        from app.services import 载荷脱敏
+        return jsonify(载荷脱敏.概览())
+
     @app.get("/api/事件/<eid>")
     def api_事件一条(eid):
         row = 签名目录.事件一条(eid)
@@ -92,6 +101,13 @@ def create_app() -> Flask:
     @app.get("/api/投递")
     def api_投递列表():
         return jsonify(签名目录.投递列表())
+
+    @app.get("/api/投递/<tid>")
+    def api_投递一条(tid):
+        row = 签名目录.投递一条(tid)
+        if not row:
+            return jsonify({"错误": "无此尝试"}), 404
+        return jsonify(row)
 
     @app.post("/api/投递")
     def api_投递():

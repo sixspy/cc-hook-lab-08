@@ -29,45 +29,63 @@
     </header>
 
 <section class="卷">
+  <p class="说明" id="脱敏概览">脱敏规则加载中…</p>
+</section>
+
+<section class="卷">
   <label>事件类型</label><input id="事件类型" placeholder="例如 invoice.paid"/>
   <label>端点键</label><input id="端点键" placeholder="ep-billing" value="ep-billing"/>
-  <label>载荷摘要</label><input id="载荷摘要" placeholder="key=value"/>
+  <label>载荷摘要</label><input id="载荷摘要" placeholder="key=value（密钥字段入库前自动遮罩）"/>
   <label>优先级</label><select id="优先级"><option>紧急</option><option selected>普通</option><option>低</option></select>
   <p class="消息" id="消息"></p>
-  <button class="按钮" type="button" id="入队钮">入队（待投）</button>
-  <button class="按钮 次" type="button" id="夹具钮">灌夹具样例</button>
+  <button class="按钮" type="button" id="入队钮">入队（待投，落库即脱敏）</button>
+  <button class="按钮 次" type="button" id="夹具钮">灌带密钥字段的入队夹具</button>
 </section>
-<section class="卷"><div class="表绕"><table><thead><tr><th>事件号</th><th>事件类型</th><th>端点键</th><th>载荷摘要</th><th>状态</th></tr></thead><tbody id="表"></tbody></table></div></section>
+<section class="卷"><div class="表绕"><table><thead><tr><th>事件号</th><th>事件类型</th><th>端点键</th><th>载荷摘要（脱敏集）</th><th>摘要脱敏态</th><th>字段遮罩</th><th>脱敏提示</th><th>状态</th></tr></thead><tbody id="表"></tbody></table></div></section>
 
   </main>
 
 <script>
+async function 刷脱敏概览() {
+  try {
+    const o = await 投递台.getJSON('/api/脱敏');
+    document.getElementById('脱敏概览').textContent =
+      `脱敏规则 ${o.规则版本}（指纹 ${o.规则指纹}）· 快照只读：${o.只读快照 ? '是' : '否'}` +
+      ` · 已脱敏 ${o.已脱敏} 条 · 待补档 ${o.待补档} 条`;
+  } catch (e) { document.getElementById('脱敏概览').textContent = e.message; }
+}
 async function 刷表() {
   const rows = await 投递台.getJSON('/api/事件');
   const tb = document.getElementById('表'); tb.innerHTML='';
   for (const r of rows) {
-    const tr = 投递台.行('<td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.事件类型)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.载荷摘要)+'</td><td></td>');
-    tr.children[4].appendChild(投递台.徽章(r.状态)); tb.appendChild(tr);
+    const tr = 投递台.行('<td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.事件类型)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.载荷摘要)+'</td><td></td><td>'+投递台.安全文本(r.遮罩字段 || '—')+'</td><td>'+投递台.安全文本(r.脱敏提示 || '')+'</td><td></td>');
+    tr.children[4].appendChild(投递台.徽章(r.摘要脱敏态 || '待补档'));
+    tr.children[7].appendChild(投递台.徽章(r.状态)); tb.appendChild(tr);
+    tr.style.cursor = 'pointer';
+    tr.title = '查看事件详情（脱敏对账同票）';
+    tr.onclick = () => { location.href = '/事件详情.html?事件号=' + encodeURIComponent(r.事件号); };
   }
 }
 document.getElementById('入队钮').onclick = async () => {
   const 消息 = document.getElementById('消息');
   try {
-    await 投递台.postJSON('/api/事件/入队', {
+    const ev = await 投递台.postJSON('/api/事件/入队', {
       事件类型: document.getElementById('事件类型').value,
       端点键: document.getElementById('端点键').value,
       载荷摘要: document.getElementById('载荷摘要').value,
       优先级: document.getElementById('优先级').value,
     });
-    消息.textContent = '已入队，状态待投';
-    await 刷表();
+    消息.textContent = `已入队 ${ev.事件号}：${ev.脱敏提示}`;
+    await 刷表(); await 刷脱敏概览();
   } catch (e) { 消息.textContent = e.message; }
 };
 document.getElementById('夹具钮').onclick = async () => {
-  await 投递台.postJSON('/api/夹具入队/批量事件样例', {});
-  await 刷表();
+  消息.textContent = '灌入中…';
+  const rep = await 投递台.postJSON('/api/夹具入队/' + encodeURIComponent('灌带密钥字段的入队夹具'), {});
+  消息.textContent = '已灌入 '+rep.入队.length+' 条含密钥事件，明文已被遮罩';
+  await 刷表(); await 刷脱敏概览();
 };
-刷表();
+刷脱敏概览(); 刷表();
 </script>
 
 </body>
